@@ -40,6 +40,9 @@
               {{ tag }}
             </span>
           </div>
+          <p v-if="item.valueMin || item.valueMax" style="color:#667eea;font-size:14px;font-weight:500;margin-bottom:4px;">
+            ¥{{ item.valueMin || 0 }} - ¥{{ item.valueMax || 0 }}
+          </p>
           <p style="color:#666;font-size:13px;margin-bottom:12px;">
             联系方式: {{ item.contact }}
           </p>

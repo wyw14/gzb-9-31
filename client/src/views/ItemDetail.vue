@@ -49,6 +49,13 @@
           </div>
         </div>
 
+        <div v-if="formatValueRange(item.valueMin, item.valueMax)" style="margin-bottom:20px;">
+          <h4 style="margin-bottom:8px;color:#666;">预估价值</h4>
+          <span style="font-size:18px;font-weight:600;color:#667eea;">
+            {{ formatValueRange(item.valueMin, item.valueMax) }}
+          </span>
+        </div>
+
         <div v-if="item.revealInfo && item.description" style="margin-bottom:20px;">
           <h4 style="margin-bottom:8px;color:#666;">详细描述</h4>
           <p style="color:#444;line-height:1.6;">{{ item.description }}</p>
@@ -93,9 +100,32 @@
             <select v-else v-model="selectedMyItemId" style="margin-bottom:12px;">
               <option value="">请选择一个物品</option>
               <option v-for="it in availableItems" :key="it.id" :value="it.id">
-                {{ it.realName }} ({{ it.mysteryTags.join(', ') }})
+                {{ it.realName }} ({{ it.mysteryTags.join(', ') }}){{ formatValueRange(it.valueMin, it.valueMax) ? ' [' + formatValueRange(it.valueMin, it.valueMax) + ']' : '' }}
               </option>
             </select>
+          </div>
+          <div v-if="fairnessWarning" :style="{
+            padding: '16px',
+            borderRadius: '12px',
+            marginBottom: '16px',
+            background: fairnessWarning.level === 'strong' ? '#fff3e0' : '#fffde7',
+            border: fairnessWarning.level === 'strong' ? '1px solid #ff9800' : '1px solid #ffc107'
+          }">
+            <div style="display:flex;align-items:flex-start;gap:10px;">
+              <span style="font-size:20px;line-height:1;">{{ fairnessWarning.level === 'strong' ? '⚠️' : '💡' }}</span>
+              <div>
+                <p :style="{
+                  fontWeight: '600',
+                  marginBottom: '4px',
+                  color: fairnessWarning.level === 'strong' ? '#e65100' : '#f57f17'
+                }">公平性提醒</p>
+                <p :style="{
+                  color: fairnessWarning.level === 'strong' ? '#bf360c' : '#8d6e63',
+                  fontSize: '14px',
+                  lineHeight: '1.5'
+                }">{{ fairnessWarning.message }}</p>
+              </div>
+            </div>
           </div>
           <button
             class="btn btn-primary"
@@ -119,9 +149,9 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
-import { getItemDetail, getMyItems, createExchange, appendAuth } from '../api/index.js'
+import { getItemDetail, getMyItems, createExchange, checkFairness, appendAuth } from '../api/index.js'
 import { userStore } from '../store/user.js'
 
 const route = useRoute()
@@ -132,6 +162,7 @@ const myItems = ref([])
 const myItemsLoading = ref(true)
 const selectedMyItemId = ref('')
 const exchanging = ref(false)
+const fairnessWarning = ref(null)
 
 const categories = {
   book: '书籍类',
@@ -153,6 +184,27 @@ const availableItems = computed(function() {
 function getCategoryName(key) {
   return categories[key] || key
 }
+
+function formatValueRange(valueMin, valueMax) {
+  const min = Number(valueMin) || 0
+  const max = Number(valueMax) || 0
+  if (min === 0 && max === 0) return ''
+  if (min === max) return '¥' + min
+  return '¥' + min + ' - ¥' + max
+}
+
+watch(selectedMyItemId, async function(newVal) {
+  fairnessWarning.value = null
+  if (!newVal || !item.value) return
+  try {
+    const result = await checkFairness(newVal, item.value.id)
+    if (result.hasWarning) {
+      fairnessWarning.value = result
+    }
+  } catch (e) {
+    console.error(e)
+  }
+})
 
 async function loadItem() {
   loading.value = true

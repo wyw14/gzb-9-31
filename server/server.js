@@ -77,6 +77,53 @@ async function generateBlurredImage(originalPath) {
   return '/uploads/' + blurredFilename;
 }
 
+function computeFairnessWarning(item1, item2) {
+  const min1 = Number(item1.valueMin) || 0;
+  const max1 = Number(item1.valueMax) || 0;
+  const min2 = Number(item2.valueMin) || 0;
+  const max2 = Number(item2.valueMax) || 0;
+
+  const hasRange1 = min1 > 0 || max1 > 0;
+  const hasRange2 = min2 > 0 || max2 > 0;
+
+  if (!hasRange1 || !hasRange2) {
+    return { hasWarning: false, level: 'none', message: '' };
+  }
+
+  const avg1 = (min1 + max1) / 2;
+  const avg2 = (min2 + max2) / 2;
+
+  if (avg1 === 0 && avg2 === 0) {
+    return { hasWarning: false, level: 'none', message: '' };
+  }
+
+  const overlapMin = Math.max(min1, min2);
+  const overlapMax = Math.min(max1, max2);
+  const hasOverlap = overlapMax >= overlapMin;
+
+  const higherAvg = Math.max(avg1, avg2);
+  const lowerAvg = Math.min(avg1, avg2);
+  const ratio = lowerAvg > 0 ? higherAvg / lowerAvg : Infinity;
+
+  if (!hasOverlap && ratio > 3) {
+    return {
+      hasWarning: true,
+      level: 'strong',
+      message: '双方物品价值区间差异较大（约' + Math.round(ratio) + '倍差距），请谨慎考虑是否继续交换。'
+    };
+  }
+
+  if (!hasOverlap || ratio > 2) {
+    return {
+      hasWarning: true,
+      level: 'mild',
+      message: '双方物品预估价值存在一定差距（约' + Math.round(ratio * 10) / 10 + '倍），建议确认后继续。'
+    };
+  }
+
+  return { hasWarning: false, level: 'none', message: '' };
+}
+
 app.get('/api/items', (req, res) => {
   const { userId } = req.query;
   let items = readItems();
@@ -91,7 +138,9 @@ app.get('/api/items', (req, res) => {
     mysteryTags: item.mysteryTags,
     image: getPublicImage(item),
     createdAt: item.createdAt,
-    status: item.status
+    status: item.status,
+    valueMin: item.valueMin || 0,
+    valueMax: item.valueMax || 0
   }));
 
   res.json(publicItems);
@@ -173,12 +222,14 @@ app.get('/api/items/:id', (req, res) => {
     image: getPublicImage(item),
     createdAt: item.createdAt,
     status: item.status,
+    valueMin: item.valueMin || 0,
+    valueMax: item.valueMax || 0,
     revealInfo: false
   });
 });
 
 app.post('/api/items', upload.single('image'), async (req, res) => {
-  const { category, mysteryTags, realName, description, contact, ownerId, ownerName } = req.body;
+  const { category, mysteryTags, realName, description, contact, ownerId, ownerName, valueMin, valueMax } = req.body;
 
   if (!category || !mysteryTags || !realName || !contact || !ownerId) {
     if (req.file) {
@@ -212,6 +263,8 @@ app.post('/api/items', upload.single('image'), async (req, res) => {
     blurredImage: blurredImagePath,
     ownerId,
     ownerName: ownerName || '匿名用户',
+    valueMin: Number(valueMin) || 0,
+    valueMax: Number(valueMax) || 0,
     status: 'available',
     createdAt: new Date().toISOString()
   };
@@ -220,6 +273,25 @@ app.post('/api/items', upload.single('image'), async (req, res) => {
   writeItems(items);
 
   res.status(201).json(newItem);
+});
+
+app.post('/api/exchanges/check-fairness', (req, res) => {
+  const { item1Id, item2Id } = req.body;
+
+  if (!item1Id || !item2Id) {
+    return res.status(400).json({ error: '缺少物品ID' });
+  }
+
+  const items = readItems();
+  const item1 = items.find(i => i.id === item1Id);
+  const item2 = items.find(i => i.id === item2Id);
+
+  if (!item1 || !item2) {
+    return res.status(404).json({ error: '物品不存在' });
+  }
+
+  const result = computeFairnessWarning(item1, item2);
+  res.json(result);
 });
 
 app.post('/api/exchanges', (req, res) => {

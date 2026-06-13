@@ -38,6 +38,10 @@ export function createExchange(myItemId, targetItemId) {
   return api.post('/exchanges', { myItemId, targetItemId }).then(res => res.data)
 }
 
+export function checkFairness(item1Id, item2Id) {
+  return api.post('/exchanges/check-fairness', { item1Id, item2Id }).then(res => res.data)
+}
+
 export function getMyExchanges(userId) {
   return api.get('/exchanges/my', { params: { userId } }).then(res => res.data)
 }

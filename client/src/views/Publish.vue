@@ -34,6 +34,16 @@
       </div>
 
       <div class="form-group">
+        <label>预估价值区间（元）</label>
+        <div style="display:flex;gap:12px;align-items:center;">
+          <input v-model.number="form.valueMin" type="number" min="0" placeholder="最低估值" style="flex:1;" />
+          <span style="color:#999;">—</span>
+          <input v-model.number="form.valueMax" type="number" min="0" placeholder="最高估值" style="flex:1;" />
+        </div>
+        <small style="color:#999;">填写物品的预估价值范围，用于交换时的公平性参考</small>
+      </div>
+
+      <div class="form-group">
         <label>物品图片 *</label>
         <input type="file" accept="image/*" @change="handleFileChange" required />
         <div v-if="previewUrl" style="margin-top:12px;">
@@ -71,7 +81,9 @@ const form = ref({
   category: '',
   realName: '',
   description: '',
-  contact: ''
+  contact: '',
+  valueMin: null,
+  valueMax: null
 })
 
 const tagsInput = ref('')
@@ -103,6 +115,10 @@ async function handleSubmit() {
     alert('请上传物品图片')
     return
   }
+  if (form.value.valueMin && form.value.valueMax && form.value.valueMin > form.value.valueMax) {
+    alert('最低估值不能大于最高估值')
+    return
+  }
 
   submitting.value = true
   try {
@@ -112,6 +128,8 @@ async function handleSubmit() {
     formData.append('realName', form.value.realName)
     formData.append('description', form.value.description)
     formData.append('contact', form.value.contact)
+    formData.append('valueMin', form.value.valueMin || 0)
+    formData.append('valueMax', form.value.valueMax || 0)
     formData.append('ownerId', userStore.user.id)
     formData.append('ownerName', userStore.user.name)
     formData.append('image', imageFile.value)
