@@ -229,11 +229,23 @@ async function loadMyItems() {
 }
 
 async function handleExchange() {
-  if (!confirm('确定要交换吗？交换后双方的真实信息将互相公开。')) {
-    return
-  }
   exchanging.value = true
   try {
+    const result = await checkFairness(selectedMyItemId.value, item.value.id)
+    if (result.hasWarning) {
+      fairnessWarning.value = result
+      const prefix = result.level === 'strong' ? '⚠️ 公平性提醒' : '💡 公平性提醒'
+      const confirmed = confirm(prefix + '\n\n' + result.message + '\n\n是否仍要继续交换？')
+      if (!confirmed) {
+        exchanging.value = false
+        return
+      }
+    } else {
+      if (!confirm('确定要交换吗？交换后双方的真实信息将互相公开。')) {
+        exchanging.value = false
+        return
+      }
+    }
     await createExchange(selectedMyItemId.value, route.params.id)
     alert('交换成功！双方的真实信息已互相公开，请通过联系方式联系对方完成交换。')
     loadItem()

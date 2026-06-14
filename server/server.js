@@ -238,6 +238,22 @@ app.post('/api/items', upload.single('image'), async (req, res) => {
     return res.status(400).json({ error: '缺少必要字段' });
   }
 
+  const numMin = Number(valueMin);
+  const numMax = Number(valueMax);
+  if (!numMin || numMin <= 0 || !numMax || numMax <= 0) {
+    if (req.file) {
+      try { fs.unlinkSync(req.file.path); } catch (e) {}
+    }
+    return res.status(400).json({ error: '请填写有效的预估价值区间（需大于0）' });
+  }
+
+  if (numMin > numMax) {
+    if (req.file) {
+      try { fs.unlinkSync(req.file.path); } catch (e) {}
+    }
+    return res.status(400).json({ error: '最低估值不能大于最高估值' });
+  }
+
   if (!req.file) {
     return res.status(400).json({ error: '请上传物品图片' });
   }
@@ -263,8 +279,8 @@ app.post('/api/items', upload.single('image'), async (req, res) => {
     blurredImage: blurredImagePath,
     ownerId,
     ownerName: ownerName || '匿名用户',
-    valueMin: Number(valueMin) || 0,
-    valueMax: Number(valueMax) || 0,
+    valueMin: numMin,
+    valueMax: numMax,
     status: 'available',
     createdAt: new Date().toISOString()
   };
